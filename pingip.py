@@ -1,8 +1,9 @@
+import argparse
 import concurrent.futures as cuf
 import subprocess
 import time
 import re
-import ipaddress
+from ipaddress import ip_network
 
 
 def shell(cmd, cwd=None):
@@ -19,15 +20,28 @@ def ping_one_ip(ip):
         stdout = shell('ping -c 1 -W 1 %s' % ip)
     except:
         return None
+    return ip
 
 
-exe = cuf.ThreadPoolExecutor(max_workers=300)
-all_task = [exe.submit(ping_one_ip, ('192.168.2.%d'%i)) for i in range(1,255)]
+def ping_all(subnet):
+    tpool = cuf.ThreadPoolExecutor()
+    all_task = []
+    for ip in ip_network(subnet).hosts():
+        all_task.append(tpool.submit(ping_one_ip, ip))
+    num = 0
+    for it in cuf.as_completed(all_task):
+        if rt:=it.result():
+            print(rt)
+            num += 1
+    print('Done, %d'%num)
 
-num = 0
-for it in cuf.as_completed(all_task):
-    if rt:=it.result():
-        print(rt)
-        num += 1
 
-print('Done, %d'%num)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('subnet')
+    args = parser.parse_args()
+    ping_all(args.subnet)
+    
+
+if __name__ == '__main__':
+    main()
