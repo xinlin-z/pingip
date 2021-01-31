@@ -56,20 +56,49 @@ def shell(cmd, cwd=None):
     return proc.stdout.decode()
 
 
-def ping_one_ip(ip, count):
-    stdout = shell(f'ping -c {count} -W 1 {ip}')
+def get_ipv4_pair(exclude_link_local=False):
+    """Return ipv4 addr pairs by scanning the output of 'ip addr' command.
+    Return [(ifname1, addr1, mask1),(ifname2, addr2, mask2),...]
+    mask is an int in str type for length.
+    """
+    stdout = shell('ip addr')
+    rv = []
+    ore_ifname = re.compile(r'^\d+:\s+(\w+):')
+    ore_ip = re.compile(r'^inet\s([\d|.]+)/(\d{1,2})')
+    name = addr = mask = None
+    for line in stdout.split('\n'):
+        if name and addr:
+            rv.append((name,addr,mask))
+            name = addr = mask = None
+        ifname = ore_ifname.search(line.strip())
+        if ifname:
+            name = ifname.groups()[0]
+            continue
+        ip = ore_ip.search(line.strip())
+        if ip:
+            addr = ip.groups()[0]
+            mask = ip.groups()[1]
+            continue
+    if exclude_link_local:
+        for i,v in enumerate(rv):
+            if v[1].startswith('127'): rv.pop(i)
+    return rv
+
+
+def ping_one_ip(ip, count, timeout):
+    stdout = shell(f'ping -c {count} -W {timeout} {ip}')
     rnum = re.search(r'(\d) received', stdout)
     if (pn:=rnum.groups()[0]) == '0':
         return None
     return f' {ip:16} {pn}/{count:<32}'
 
 
-def ping_all(net, count, worker_num):
+def ping_all(net, count, worker_num, timeout):
     tpool = (cuf.ThreadPoolExecutor() if worker_num is None
              else cuf.ThreadPoolExecutor(worker_num))
     all_task = []
-    for ip in ip_network(net).hosts():
-        all_task.append(tpool.submit(ping_one_ip, str(ip), count))
+    for ip in ip_network(net,strict=False).hosts():
+        all_task.append(tpool.submit(ping_one_ip, str(ip), count, timeout))
     num = 0
     for it in cuf.as_completed(all_task):
         if rt:=it.result():
@@ -77,16 +106,27 @@ def ping_all(net, count, worker_num):
             num += 1
             cprint(f' Worker: {threading.active_count()-1}, Found IP: {num}',
                    end='\r', fg='k',bg='r')
-    cprint(f' Found IP: {num:<64}', fg='r')
+    cprint(f' Found IP: {num:<64}', fg='m')
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--net', help='network address/mask')
+    net = parser.add_mutually_exclusive_group(required=True)
+    net.add_argument('--net', help='network address/mask')
+    net.add_argument('--local',action='store_true',help='choose a local port')
     parser.add_argument('-c', type=int, default=2, help='count of ping')
     parser.add_argument('-w', type=int, help='how many ping worker')
+    parser.add_argument('-t', type=int, default=1, help='timeout in second')
     args = parser.parse_args()
-    ping_all(args.net, args.c, args.w)
+    if args.net:
+        ping_all(args.net, args.c, args.w, args.t)
+    else:
+        ipv4_pair = get_ipv4_pair(exclude_link_local=True)
+        print('Index    Info')
+        for i,v in enumerate(ipv4_pair):
+            print(f'{i:^6}   {v}')
+        i = int(input('--> Choose a local port index:'))
+        ping_all(f'{ipv4_pair[i][1]}/{ipv4_pair[i][2]}',args.c,args.w,args.t)
 
 
 if __name__ == '__main__':
