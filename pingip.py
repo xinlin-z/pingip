@@ -5,6 +5,7 @@ import subprocess
 import time
 import re
 from ipaddress import ip_network
+import threading
 
 
 def cprint(*objects, sep=' ', end='\n', file=sys.stdout,
@@ -56,16 +57,16 @@ def shell(cmd, cwd=None):
 
 
 def ping_one_ip(ip, count):
-    stdout = shell('ping -c %d -W 1 %s' % (count,ip))
+    stdout = shell(f'ping -c {count} -W 1 {ip}')
     rnum = re.search(r'(\d) received', stdout)
     if (pn:=rnum.groups()[0]) == '0':
         return None
-    return f'{ip} {pn}/{count}'
+    return f' {ip:16} {pn}/{count:<32}'
 
 
 def ping_all(net, count, worker_num):
-    tpool = eval('cuf.ThreadPoolExecutor() if worker_num is None'
-                 ' else cuf.ThreadPoolExecutor(worker_num)')
+    tpool = (cuf.ThreadPoolExecutor() if worker_num is None
+             else cuf.ThreadPoolExecutor(worker_num))
     all_task = []
     for ip in ip_network(net).hosts():
         all_task.append(tpool.submit(ping_one_ip, str(ip), count))
@@ -74,8 +75,9 @@ def ping_all(net, count, worker_num):
         if rt:=it.result():
             print(rt)
             num += 1
-            cprint(' Found IP: %d'%num, end='\r', fg='k',bg='r')
-    cprint(' Found IP: %d'%num, fg='k',bg='r')
+            cprint(f' Worker: {threading.active_count()-1}, Found IP: {num}',
+                   end='\r', fg='k',bg='r')
+    cprint(f' Found IP: {num:<64}', fg='r')
 
 
 def main():
