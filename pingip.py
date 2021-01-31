@@ -92,17 +92,17 @@ def ping_one_ip(ip, count, timeout):
     return ip,f'{ip:16} {pn}/{count:<32}'
 
 
-num = 0
+ipnum = 0
 
 
 def wait_completed(cuf, tasks):
-    global num
+    global ipnum
     for it in cuf.as_completed(tasks):
         if (rt:=it.result())[1]:
             print(rt[1])
-            num += 1
+            ipnum += 1
         cprint(f' Worker: {threading.active_count()-1},'
-               f' Pinged: {rt[0]}, Found IP: {num}',
+               f' Pinged: {rt[0]}, Found IP: {ipnum}',
                end='', flush=True, fg='k',bg='m')
         print(' '*4, end='\r')
 
@@ -121,8 +121,8 @@ def ping_all(net, count, worker_num, timeout):
             wait_completed(cuf, tasks)
             submit_num = 0
             tasks = []
-    wait_completed(cuf, tasks)
-    cprint(f'Found IP: {num:<64}', fg='m')
+    if submit_num > 0: wait_completed(cuf, tasks)
+    cprint(f'Found IP: {ipnum:<64}', fg='m')
 
 
 def main():
