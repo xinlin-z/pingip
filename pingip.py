@@ -3,7 +3,7 @@ import argparse
 import concurrent.futures as cuf
 import subprocess
 import re
-from ipaddress import ip_network
+from ipaddress import ip_network, ip_address
 import threading
 
 
@@ -55,7 +55,7 @@ def shell(cmd, cwd=None):
     return proc.stdout.decode()
 
 
-def get_ipv4_pair(exclude_link_local=False):
+def get_ipv4_pair2():
     """Return ipv4 addr pairs by scanning the output of 'ip addr' command.
     Return [(ifname1, addr1, mask1),(ifname2, addr2, mask2),...]
     mask is an int in str type for length.
@@ -78,9 +78,9 @@ def get_ipv4_pair(exclude_link_local=False):
             addr = ip.groups()[0]
             mask = ip.groups()[1]
             continue
-    if exclude_link_local:
-        for i,v in enumerate(rv):
-            if v[1].startswith('127'): rv.pop(i)
+    for i,v in enumerate(rv):
+        if ip_address(v[1]).is_link_local: rv.pop(i)
+        elif ip_address(v[1]).is_loopback: rv.pop(i)
     return rv
 
 
@@ -137,7 +137,7 @@ def main():
     if args.net:
         ping_all(args.net, args.c, args.w, args.t)
     else:
-        ipv4_pair = get_ipv4_pair(exclude_link_local=True)
+        ipv4_pair = get_ipv4_pair2()
         cprint('Index    PortInfo', fg='g')
         for i,v in enumerate(ipv4_pair):
             print(f'{i:^6}   {v}')
