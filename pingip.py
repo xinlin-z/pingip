@@ -93,20 +93,36 @@ def ping_one_ip(ip, count, timeout):
     return ip,f'{ip:16} {pn}/{count:<32}'
 
 
-def ping_all(net, count, worker_num, timeout):
-    tpool = (cuf.ThreadPoolExecutor() if worker_num is None
-             else cuf.ThreadPoolExecutor(worker_num))
-    all_task = []
-    for ip in ip_network(net,strict=False).hosts():
-        all_task.append(tpool.submit(ping_one_ip, str(ip), count, timeout))
-    num = 0
-    for it in cuf.as_completed(all_task):
+num = 0
+
+
+def wait_completed(cuf, tasks):
+    global num
+    for it in cuf.as_completed(tasks):
         if (rt:=it.result())[1]:
             print(rt[1])
             num += 1
         cprint(f' Worker: {threading.active_count()-1},'
                f' Pinged: {rt[0]}, Found IP: {num}',
-               end='\r', flush=True, fg='k',bg='r')
+               end='', flush=True, fg='k',bg='m')
+        print(' '*4, end='\r')
+
+
+def ping_all(net, count, worker_num, timeout):
+    tpool = (cuf.ThreadPoolExecutor() if worker_num is None
+             else cuf.ThreadPoolExecutor(worker_num))
+    submit_num = 0
+    tasks = []
+    for ip in ip_network(net,strict=False).hosts():
+        tasks.append(tpool.submit(ping_one_ip, str(ip), count, timeout))
+        submit_num += 1
+        if submit_num < tpool._max_workers:
+            continue
+        else:
+            wait_completed(cuf, tasks)
+            submit_num = 0
+            tasks = []
+    wait_completed(cuf, tasks)
     cprint(f'Found IP: {num:<64}', fg='m')
 
 
