@@ -78,10 +78,13 @@ def get_ipv4_pair2():
             addr = ip.groups()[0]
             mask = ip.groups()[1]
             continue
+    rt = []
     for i,v in enumerate(rv):
-        if ip_address(v[1]).is_link_local: rv.pop(i)
-        elif ip_address(v[1]).is_loopback: rv.pop(i)
-    return rv
+        if (ip_address(v[1]).is_link_local or
+                ip_address(v[1]).is_loopback):
+            continue
+        rt.append(v)
+    return rt
 
 
 def ping_one_ip(ip, count, timeout):
