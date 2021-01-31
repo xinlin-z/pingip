@@ -89,8 +89,8 @@ def ping_one_ip(ip, count, timeout):
     stdout = shell(f'ping -c {count} -W {timeout} {ip}')
     rnum = re.search(r'(\d) received', stdout)
     if (pn:=rnum.groups()[0]) == '0':
-        return None
-    return f' {ip:16} {pn}/{count:<32}'
+        return ip,None
+    return ip,f'{ip:16} {pn}/{count:<32}'
 
 
 def ping_all(net, count, worker_num, timeout):
@@ -101,12 +101,13 @@ def ping_all(net, count, worker_num, timeout):
         all_task.append(tpool.submit(ping_one_ip, str(ip), count, timeout))
     num = 0
     for it in cuf.as_completed(all_task):
-        if rt:=it.result():
-            print(rt)
+        if (rt:=it.result())[1]:
+            print(rt[1])
             num += 1
-            cprint(f' Worker: {threading.active_count()-1}, Found IP: {num}',
-                   end='\r', fg='k',bg='r')
-    cprint(f' Found IP: {num:<64}', fg='m')
+        cprint(f' Worker: {threading.active_count()-1},'
+               f' Pinged: {rt[0]}, Found IP: {num}',
+               end='\r', flush=True, fg='k',bg='r')
+    cprint(f'Found IP: {num:<64}', fg='m')
 
 
 def main():
@@ -122,10 +123,10 @@ def main():
         ping_all(args.net, args.c, args.w, args.t)
     else:
         ipv4_pair = get_ipv4_pair(exclude_link_local=True)
-        print('Index    Info')
+        cprint('Index    PortInfo', fg='g')
         for i,v in enumerate(ipv4_pair):
             print(f'{i:^6}   {v}')
-        i = int(input('--> Choose a local port index:'))
+        i = int(input('--> Choose a local port index: '))
         ping_all(f'{ipv4_pair[i][1]}/{ipv4_pair[i][2]}',args.c,args.w,args.t)
 
 
