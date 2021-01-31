@@ -2,7 +2,6 @@ import sys
 import argparse
 import concurrent.futures as cuf
 import subprocess
-import time
 import re
 from ipaddress import ip_network
 import threading
