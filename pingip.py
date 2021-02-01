@@ -55,7 +55,7 @@ def shell(cmd, cwd=None):
     return proc.stdout.decode()
 
 
-def get_ipv4_pair2():
+def get_ipv4_pair():
     """Return ipv4 addr pairs by scanning the output of 'ip addr' command.
     Return [(ifname1, addr1, mask1),(ifname2, addr2, mask2),...]
     mask is an int in str type for length.
@@ -78,19 +78,16 @@ def get_ipv4_pair2():
             addr = ip.groups()[0]
             mask = ip.groups()[1]
             continue
-    rt = []
-    for i,v in enumerate(rv):
-        if (ip_address(v[1]).is_link_local or
-                ip_address(v[1]).is_loopback):
-            continue
-        rt.append(v)
-    return rt
+    return rv
 
 
 def ping_one_ip(ip, count, timeout):
     stdout = shell(f'ping -c {count} -W {timeout} {ip}')
     rnum = re.search(r'(\d) received', stdout)
-    if (pn:=rnum.groups()[0]) == '0':
+    try:
+        if (pn:=rnum.groups()[0]) == '0':
+            return ip,None
+    except:
         return ip,None
     return ip,f'{ip:16} {pn}/{count:<32}'
 
@@ -125,7 +122,7 @@ def ping_all(net, count, worker_num, timeout):
             submit_num = 0
             tasks = []
     if submit_num > 0: wait_completed(cuf, tasks)
-    cprint(f'Found IP: {ipnum:<64}', fg='m')
+    cprint(f'IP Number: {ipnum:<64}', fg='m')
 
 
 def main():
@@ -140,8 +137,8 @@ def main():
     if args.net:
         ping_all(args.net, args.c, args.w, args.t)
     else:
-        ipv4_pair = get_ipv4_pair2()
-        cprint('Index    PortInfo', fg='g')
+        ipv4_pair = get_ipv4_pair()
+        cprint('Index    Interface,IP,Mask', fg='g')
         for i,v in enumerate(ipv4_pair):
             print(f'{i:^6}   {v}')
         i = int(input('--> Choose a local port index: '))
