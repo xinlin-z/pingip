@@ -1,8 +1,9 @@
 # pingip
 
 It's a ping scan tool that can ping a network and find out all ip addresses
-of host which responded. Pingip uses `ping` command to do it's job. Below
-are usage examples and parameters explanation.
+of host which responded. Pingip uses `ping` command to do it's job. This tool
+can help find out all the ip assigned in your network in a fly. Below
+are usage examples and parameters explanations.
 
 ```shell
 $ python3 pingip.py -h
@@ -27,7 +28,8 @@ to the interface you choose.
 
 **-w**: specify the number of ping thread workers, the more workers the faster.
 
-**2/2**: send out 2 ping packages and receive 2 replys.
+**2/2**: send out 2 ping packages and receive 2 replys. Ip address will be
+displayed out if at least 1 replay is received.
 
 ```shell
 $ python3 pingip.py --net 192.168.1.198/24 -w 200 -c 4 -t 2
@@ -51,7 +53,7 @@ $ python3 pingip.py --net 36.1.36.1/24 -w 500
 36.1.36.17       2/2
 36.1.36.153      2/2
 36.1.36.41       2/2
-36.1.36.72       2/2
+36.1.36.72       1/2
 36.1.36.63       2/2
 36.1.36.105      2/2
 36.1.36.141      2/2
@@ -65,3 +67,5 @@ $ python3 pingip.py --net 36.1.36.1/24 -w 500
 36.1.36.122      1/2
 IP Number: 16
 ```
+
+Enjoy...:)
