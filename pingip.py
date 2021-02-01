@@ -3,7 +3,7 @@ import argparse
 import concurrent.futures as cuf
 import subprocess
 import re
-from ipaddress import ip_network, ip_address
+from ipaddress import ip_network
 import threading
 
 
@@ -87,7 +87,7 @@ def ping_one_ip(ip, count, timeout):
     try:
         if (pn:=rnum.groups()[0]) == '0':
             return ip,None
-    except:
+    except AttributeError:
         return ip,None
     return ip,f'{ip:16} {pn}/{count:<32}'
 

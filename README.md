@@ -26,7 +26,8 @@ IP Number: 5
 **--local**: list all local interfaces and to ping the whole ip network belong
 to the interface you choose.
 
-**-w**: specify the number of ping thread workers, the more workers the faster.
+**-w**: specify the number of ping thread workers, the more workers the
+faster scan, default worker number is determined by Python.
 
 **2/2**: send out 2 ping packages and receive 2 replys. Ip address will be
 displayed out if at least 1 replay is received.
@@ -68,4 +69,4 @@ $ python3 pingip.py --net 36.1.36.1/24 -w 500
 IP Number: 16
 ```
 
-Enjoy...:)
+Enjoy...^____^
