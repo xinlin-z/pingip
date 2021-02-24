@@ -5,6 +5,7 @@ import subprocess
 import re
 from ipaddress import ip_network
 import threading
+import queue
 
 
 def cprint(*objects, sep=' ', end='\n', file=sys.stdout,
@@ -81,48 +82,61 @@ def get_ipv4_pair():
     return rv
 
 
+qmsg = queue.Queue()
+sp = None
+ip_num = 0
+ip_tnum = 0
+
+
 def ping_one_ip(ip, count, timeout):
     stdout = shell(f'ping -c {count} -W {timeout} {ip}')
     rnum = re.search(r'(\d) received', stdout)
     try:
         if (pn:=rnum.groups()[0]) == '0':
-            return ip,None
+            qmsg.put((ip,None))
+            return
     except AttributeError:
-        return ip,None
-    return ip,f'{ip:16} {pn}/{count:<32}'
+        qmsg.put((ip,None))
+        return
+    qmsg.put((ip,f'{ip:16} {pn}/{count:<32}'))
 
 
-ipnum = 0
-
-
-def wait_completed(cuf, tasks):
-    global ipnum
-    for it in cuf.as_completed(tasks):
-        if (rt:=it.result())[1]:
-            print(rt[1])
-            ipnum += 1
-        cprint(f' Worker: {threading.active_count()-1},'
-               f' Pinged: {rt[0]}, Found IP: {ipnum}',
-               end='', flush=True, fg='k',bg='m')
-        print(' '*4, end='\r')
+def show_completed():
+    global ip_num,ip_tnum
+    s24 = ' ' * 24
+    while rt:=qmsg.get():
+        sp.release()
+        if rt[0] is None: return
+        ip_tnum += 1
+        if rt[1]:
+            print(rt[1], s24)
+            ip_num += 1
+        cprint(f' Worker: {threading.active_count()-2},'
+               f' Pinging: {rt[0]}, Found IP: {ip_num}/{ip_tnum} ',
+               end='\r', flush=True, fg='k',bg='m')
 
 
 def ping_all(net, count, worker_num, timeout):
+    # start show thread
+    tshow = threading.Thread(target=show_completed, args=(), daemon=True)
+    tshow.start()
+    # create thread pool
     tpool = (cuf.ThreadPoolExecutor() if worker_num is None
              else cuf.ThreadPoolExecutor(worker_num))
-    submit_num = 0
-    tasks = []
+    # create global semaphore
+    global sp
+    sp = threading.BoundedSemaphore(tpool._max_workers)
+    # submit tasks loop
     for ip in ip_network(net,strict=False).hosts():
-        tasks.append(tpool.submit(ping_one_ip, str(ip), count, timeout))
-        submit_num += 1
-        if submit_num < tpool._max_workers:
-            continue
-        else:
-            wait_completed(cuf, tasks)
-            submit_num = 0
-            tasks = []
-    if submit_num > 0: wait_completed(cuf, tasks)
-    cprint(f'IP Number: {ipnum:<64}', fg='m')
+        sp.acquire()
+        tpool.submit(ping_one_ip, str(ip), count, timeout)
+    # wait tpool
+    tpool.shutdown()
+    # wait tshow
+    qmsg.put(None)
+    tshow.join()
+    # last print
+    cprint(f'IP Number: {ip_num}/{ip_tnum:<64}', fg='m')
 
 
 def main():
@@ -130,8 +144,8 @@ def main():
     net = parser.add_mutually_exclusive_group(required=True)
     net.add_argument('--net', help='network address/mask')
     net.add_argument('--local',action='store_true',help='choose a local port')
-    parser.add_argument('-c', type=int, default=2, help='count of ping')
-    parser.add_argument('-w', type=int, help='how many ping worker')
+    parser.add_argument('-c', type=int, default=2, help='count of ping packet')
+    parser.add_argument('-w', type=int, help='how many threaded ping workers')
     parser.add_argument('-t', type=int, default=1, help='timeout in second')
     args = parser.parse_args()
     if args.net:
@@ -141,7 +155,7 @@ def main():
         cprint('Index    Interface,IP,Mask', fg='g')
         for i,v in enumerate(ipv4_pair):
             print(f'{i:^6}   {v}')
-        i = int(input('--> Choose a local port index: '))
+        i = int(input('--> choose a local port index: '))
         ping_all(f'{ipv4_pair[i][1]}/{ipv4_pair[i][2]}',args.c,args.w,args.t)
 
 
